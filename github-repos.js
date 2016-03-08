@@ -42,13 +42,11 @@ function createFile (user, hash, data) {
 // Rx.Observable.merge(hashFile, dataStream).zip(createFile)
 
 /*
-
 1) Take github username
 2) Create folder based on username (`/repos-${user}`)
 3) Get all repos for username (`https://api.github.com/users/${user}/repos`)
 4) Get the hash of the repo data
 5) Create file where name is hash and content is repo
-
 */
 
 // Entry point for the streams since this is the common info.  Could be an input stream as well.
@@ -71,28 +69,27 @@ let getRepos$ = ghUser$
 // to generate some hashes that will be passed along to our file creator/
 let repos$ = ensureUser$
   .zip(getRepos$, (_, repos) => repos)
-  .map(repo => ({hash: getHash(r), repo}))
+  .flatMap(repos => {
+    return Rx.Observable.from(repos.map(repo => ({hash: getHash(repo), repo})))
+  })
 
 let fileWriter$ = Rx.Observable.combineLatest(
     ghUser$,
     repos$,
-
-    // the last function argument to combineLatest is the mapper function. so in this case we're just building up
-    // a simple object with the info the user needs.
     (user, repo) => ({user, hash: repo.hash, repo: repo.repo})
   )
   .map(p => {
     return createFile(p.user, p.hash, p.repo)
   })
+  .flatMap(f => f)
 
-let reposSubscription = fileWriter$.subscribe(
+fileWriter$.subscribe(
   function (x) {
-    // console.log(JSON.stringify(x, null, 2))
-    // console.log('Next: %s', x)
+    console.log('wrote a new repo to json')
   },
   function (err) {
-    // console.log('Error: %s', err)
+    console.log('Error: %s', err)
   },
-  function () {
-    // console.log('Completed')
+  function (e) {
+    console.log('Completed', e)
   })
