@@ -57,15 +57,15 @@ let ghUser$ = Rx.Observable.just(GITHUB_USER)
 // Ensure user seems to be a side effect that you want to verify completes.
 // If you have no need for verification then I would just change this from `map` to `do`
 let ensureUser$ = ghUser$
+  .do((u) => debug(`Creating directory for: ${u}`))
   .map(u => Rx.Observable.fromPromise(createDir(u)))
   .flatMapLatest(x => x)
-  .do(() => debug('created user dir'))
 
 // Convert your promise into a stream. makes it easier to work with.
 let getRepos$ = ghUser$
+  .do((u) => debug(`Fetching user repos for: ${u}`))
   .map(u => Rx.Observable.fromPromise(getRepos(u)))
   .flatMapLatest(x => x)
-  .do(() => debug('got user repos'))
 
 // Here's the meat.  We want to only map after we've ensured the user exists - then we want
 // to generate some hashes that will be passed along to our file creator/
