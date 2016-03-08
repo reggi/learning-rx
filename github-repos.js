@@ -1,3 +1,4 @@
+import { join } from 'path'
 import axios from 'axios'
 import Rx from 'rx'
 import Promise from 'bluebird'
@@ -7,8 +8,8 @@ import fs from 'fs-extra'
 Promise.promisifyAll(fs)
 
 let {
-  ensureDir,
-  outputJson } = fs
+  ensureDirAsync,
+  outputJsonAsync } = fs
 
 const GITHUB_USER = 'reggi'
 
@@ -25,13 +26,37 @@ function getHash (json) {
   return crypto.createHmac('sha256', str)
 }
 
-function createFile (hash, data) {
-  return outputJson(`/repos/${hash}.json`, data)
+function createDir (user) {
+  return ensureDirAsync(join(__dirname, `/repos-${user}`))
 }
 
-// ensureDir('/repos')
+function createFile (hash, data) {
+  return outputJsonAsync(join(__dirname, `/repos/${hash}.json`), data)
+}
 
-let repos = Rx.Observable.fromPromise(getRepos(GITHUB_USER))
+// ensureDir('/repos-${GITHUB_USER}')
+
+// let repos = Rx.Observable.fromPromise(getRepos(GITHUB_USER))
+
+// Rx.Observable.merge(hashFile, dataStream).zip(createFile)
+
+let repos = Rx.Observable.just(GITHUB_USER)
+  .map(user => {
+    return createDir(user)
+  })
+  .map(user => {
+    return getRepos(user)
+  })
+
+/*
+
+1) Take github username
+2) Create folder based on username (`/repos-${user}`)
+3) Get all repos for username (`https://api.github.com/users/${user}/repos`)
+4) Get the hash of the repo data
+5) Create file where name is hash and content is repo
+
+*/
 
 let reposSubscription = repos.subscribe(
   function (x) {
@@ -44,8 +69,3 @@ let reposSubscription = repos.subscribe(
   function () {
     console.log('Completed')
   })
-
-// make request to get all github repos
-// ensure a folder called "/repos" exists
-// get the hash of the repo data
-// save individual data as a json file where the name of the file is the hash
