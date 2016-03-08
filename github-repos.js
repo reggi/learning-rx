@@ -22,31 +22,23 @@ function getRepos (user) {
 }
 
 function getHash (json) {
-  let str = JSON.stringify(json)
-  return crypto.createHmac('sha256', str)
+  let text = JSON.stringify(json)
+  return crypto.createHash('md5').update(text).digest('hex')
 }
 
 function createDir (user) {
   return ensureDirAsync(join(__dirname, `/repos-${user}`))
 }
 
-function createFile (hash, data) {
-  return outputJsonAsync(join(__dirname, `/repos/${hash}.json`), data)
+function createFile (user, hash, data) {
+  return outputJsonAsync(join(__dirname, `/repos-${user}/${hash}.json`), data)
 }
 
 // ensureDir('/repos-${GITHUB_USER}')
 
-// let repos = Rx.Observable.fromPromise(getRepos(GITHUB_USER))
+let x = Rx.Observable.fromPromise(createDir(GITHUB_USER))
 
 // Rx.Observable.merge(hashFile, dataStream).zip(createFile)
-
-let repos = Rx.Observable.just(GITHUB_USER)
-  .map(user => {
-    return createDir(user)
-  })
-  .map(user => {
-    return getRepos(user)
-  })
 
 /*
 
@@ -58,14 +50,31 @@ let repos = Rx.Observable.just(GITHUB_USER)
 
 */
 
+let repos = Rx.Observable.just(GITHUB_USER)
+.flatMap(user => Promise.props({
+  dir: createDir(user),
+  repo: getRepos(user),
+  user: Promise.resolve(user)
+}))
+.flatMap(data => {
+  return data.repo
+})
+.flatMap(repo => Promise.props({
+  hash: getHash(repo),
+  repo: repo
+}))
+.map(repo => {
+  return createFile(GITHUB_USER, repo.hash, repo.repo)
+})
+
 let reposSubscription = repos.subscribe(
   function (x) {
-    console.log(x)
-    console.log('Next: %s', x)
+    // console.log(JSON.stringify(x, null, 2))
+    // console.log('Next: %s', x)
   },
   function (err) {
-    console.log('Error: %s', err)
+    // console.log('Error: %s', err)
   },
   function () {
-    console.log('Completed')
+    // console.log('Completed')
   })
