@@ -36,8 +36,6 @@ function createFile (user, hash, data) {
 
 // ensureDir('/repos-${GITHUB_USER}')
 
-let x = Rx.Observable.fromPromise(createDir(GITHUB_USER))
-
 // Rx.Observable.merge(hashFile, dataStream).zip(createFile)
 
 /*
@@ -50,24 +48,39 @@ let x = Rx.Observable.fromPromise(createDir(GITHUB_USER))
 
 */
 
-let repos = Rx.Observable.just(GITHUB_USER)
-.flatMap(user => Promise.props({
-  dir: createDir(user),
-  repo: getRepos(user),
-  user: Promise.resolve(user)
-}))
-.flatMap(data => {
-  return data.repo
-})
-.flatMap(repo => Promise.props({
-  hash: getHash(repo),
-  repo: repo
-}))
-.map(repo => {
-  return createFile(GITHUB_USER, repo.hash, repo.repo)
-})
+// Entry point for the streams since this is the common info.  Could be an input stream as well.
+let ghUser$ = Rx.Observable.just(GITHUB_USER)
 
-let reposSubscription = repos.subscribe(
+// Ensure user seems to be a side effect that you want to verify completes.
+// If you have no need for verification then I would just change this from `map` to `do`
+let ensureUser$ = ghUser$
+  .map(u => Rx.Observable.fromPromise(createDir(u)))
+  .flatMapLatest(x => x)
+
+// Convert your promise into a stream. makes it easier to work with.
+let getRepos$ = ghUser$
+  .map(u => Rx.Observable.fromPromise(getRepos(u)))
+  .flatMapLatest(x => x)
+
+// Here's the meat.  We want to only map after we've ensured the user exists - then we want
+// to generate some hashes that will be passed along to our file creator/
+let repos$ = ensureUser$
+  .zip(getRepos$, (_, repos) => repos)
+  .map(repo => ({hash: getHash(r), repo}))
+
+let fileWriter$ = Rx.Observable.combineLatest(
+    ghUser$,
+    repos$,
+
+    // the last function argument to combineLatest is the mapper function. so in this case we're just building up
+    // a simple object with the info the user needs.
+    (user, repo) => ({user, hash: repo.hash, repo: repo.repo})
+  )
+  .map(p => {
+    return createFile(p.user, p.hash, p.repo)
+  })
+
+let reposSubscription = fileWriter$.subscribe(
   function (x) {
     // console.log(JSON.stringify(x, null, 2))
     // console.log('Next: %s', x)
