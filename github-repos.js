@@ -4,6 +4,9 @@ import Rx from 'rx'
 import Promise from 'bluebird'
 import crypto from 'crypto'
 import fs from 'fs-extra'
+import Debug from 'debug'
+
+let debug = Debug('github-repos')
 
 Promise.promisifyAll(fs)
 
@@ -56,11 +59,13 @@ let ghUser$ = Rx.Observable.just(GITHUB_USER)
 let ensureUser$ = ghUser$
   .map(u => Rx.Observable.fromPromise(createDir(u)))
   .flatMapLatest(x => x)
+  .do(() => debug('created user dir'))
 
 // Convert your promise into a stream. makes it easier to work with.
 let getRepos$ = ghUser$
   .map(u => Rx.Observable.fromPromise(getRepos(u)))
   .flatMapLatest(x => x)
+  .do(() => debug('got user repos'))
 
 // Here's the meat.  We want to only map after we've ensured the user exists - then we want
 // to generate some hashes that will be passed along to our file creator/

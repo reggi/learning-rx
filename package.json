@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "babel-node github-repos.js",
+    "start": "DEBUG=github-repos babel-node github-repos.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -12,6 +12,7 @@
   "dependencies": {
     "axios": "^0.9.1",
     "bluebird": "^3.3.4",
+    "debug": "^2.2.0",
     "fs-extra": "^0.26.5",
     "rx": "^4.1.0"
   },
