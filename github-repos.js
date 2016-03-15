@@ -34,7 +34,9 @@ function createDir (user) {
 }
 
 function createFile (user, hash, data) {
-  return outputJsonAsync(join(__dirname, `/repos-${user}/${hash}.json`), data)
+  let file = join(__dirname, `/repos-${user}/${hash}.json`)
+  return outputJsonAsync(file, data)
+    .then(() => file)
 }
 
 // ensureDir('/repos-${GITHUB_USER}')
@@ -51,17 +53,18 @@ function createFile (user, hash, data) {
 
 // Entry point for the streams since this is the common info.  Could be an input stream as well.
 let ghUser$ = Rx.Observable.just(GITHUB_USER)
+  .do((u) => debug(`pulling ${u}`))
 
 // Ensure user seems to be a side effect that you want to verify completes.
 // If you have no need for verification then I would just change this from `map` to `do`
 let ensureUser$ = ghUser$
-  .do((u) => debug(`Creating directory for: ${u}`))
+  .do((u) => debug(`ensuring directory for: ${u}`))
   .map(u => Rx.Observable.fromPromise(createDir(u)))
   .flatMapLatest(x => x)
 
 // Convert your promise into a stream. makes it easier to work with.
 let getRepos$ = ghUser$
-  .do((u) => debug(`Fetching user repos for: ${u}`))
+  .do((u) => debug(`fetching user repos for: ${u}`))
   .map(u => Rx.Observable.fromPromise(getRepos(u)))
   .flatMapLatest(x => x)
 
@@ -82,14 +85,16 @@ let fileWriter$ = Rx.Observable.combineLatest(
     return createFile(p.user, p.hash, p.repo)
   })
   .flatMap(f => f)
+  .do((file) => debug(`wrote a new repo to json ${file}`))
+  .toArray()
 
 fileWriter$.subscribe(
   function (x) {
-    console.log('wrote a new repo to json')
+    debug('subscribe')
   },
   function (err) {
     console.log('Error: %s', err)
   },
-  function (e) {
-    console.log('Completed', e)
+  function () {
+    debug('completed')
   })
